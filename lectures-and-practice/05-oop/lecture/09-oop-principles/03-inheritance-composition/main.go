@@ -15,7 +15,6 @@ func (e Engine) Start() {
 
 // Композиция с именованным полем: автомобиль содержит двигатель.
 type PetrolCar struct {
-	weels  Weels
 	engine Engine
 }
 
