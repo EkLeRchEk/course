@@ -8,11 +8,29 @@ import (
 	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
 )
 
+// Перенос confirmed-брони ближе этого срока до начала требует
+// повторного подтверждения.
+const rescheduleConfirmWindow = 2 * time.Hour
+
 type BookingService struct {
 	bookingRepo  BookingRepository
 	employeeRepo EmployeeRepository
 	availability RoomAvailability
 	notifier     Notifier
+}
+
+func NewBookingService(
+	bookings BookingRepository,
+	employees EmployeeRepository,
+	availability RoomAvailability,
+	notifier Notifier,
+) *BookingService {
+	return &BookingService{
+		bookingRepo:  bookings,
+		employeeRepo: employees,
+		availability: availability,
+		notifier:     notifier,
+	}
 }
 
 type CreateBookingInput struct {
@@ -23,9 +41,8 @@ type CreateBookingInput struct {
 }
 
 func (s *BookingService) Create(ctx context.Context, in CreateBookingInput) (*domain.Booking, error) {
-	booking, err := domain.NewBooking(in.RoomID, in.EmployeeID, in.StartAt, in.EndAt, time.Now())
-	if err != nil {
-		return nil, err
+	if !in.EndAt.After(in.StartAt) {
+		return nil, domain.ErrInvalidInterval
 	}
 
 	canOverride, err := s.canOverride(ctx, in.EmployeeID)
@@ -40,7 +57,7 @@ func (s *BookingService) Create(ctx context.Context, in CreateBookingInput) (*do
 
 	var conflicts []*domain.Booking
 	for _, b := range existing {
-		if b.IsActive() { // отменённые комнату не занимают
+		if b.Overlaps(in.RoomID, in.StartAt, in.EndAt) {
 			conflicts = append(conflicts, b)
 		}
 	}
@@ -51,9 +68,7 @@ func (s *BookingService) Create(ctx context.Context, in CreateBookingInput) (*do
 		}
 		// Админ побеждает: отменяются все пересекающиеся брони.
 		for _, c := range conflicts {
-			if err := c.Cancel(); err != nil {
-				return nil, err
-			}
+			c.Cancel()
 			if _, err := s.bookingRepo.Update(ctx, c.ID(), c); err != nil {
 				return nil, err
 			}
@@ -61,21 +76,25 @@ func (s *BookingService) Create(ctx context.Context, in CreateBookingInput) (*do
 	}
 
 	available, err := s.availability.Check(ctx, in.RoomID, in.StartAt, in.EndAt)
-	if err == nil && available {
-		if err := booking.Confirm(); err != nil {
-			return nil, err
-		}
+	if err != nil {
+		available = false
 	}
 
-	id, err := s.bookingRepo.Create(ctx, booking)
+	booking, err := domain.NewBooking(in.RoomID, in.EmployeeID, in.StartAt, in.EndAt, available, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	booking.AssignID(id)
 
+	id, err := s.bookingRepo.Create(ctx, &booking)
+	if err != nil {
+		return nil, err
+	}
+	booking = booking.AssignID(id) // AssignID возвращает копию, результат надо сохранить
+
+	// Fail-open: рассылка не блокирует создание и не влияет на статус.
 	_ = s.notifier.BookingCreated(ctx, id)
 
-	return booking, nil
+	return &booking, nil
 }
 
 func (s *BookingService) Get(ctx context.Context, id int64) (*domain.Booking, error) {
@@ -83,6 +102,8 @@ func (s *BookingService) Get(ctx context.Context, id int64) (*domain.Booking, er
 }
 
 func (s *BookingService) Reschedule(ctx context.Context, id int64, startAt, endAt time.Time) (*domain.Booking, error) {
+	// Валидация до обращения к хранилищу: кривой интервал даёт 400
+	// даже для несуществующей брони.
 	if !endAt.After(startAt) {
 		return nil, domain.ErrInvalidInterval
 	}
@@ -92,12 +113,13 @@ func (s *BookingService) Reschedule(ctx context.Context, id int64, startAt, endA
 		return nil, err
 	}
 
-	if err := booking.Reschedule(startAt, endAt, time.Now()); err != nil {
+	if err := booking.Reschedule(startAt, endAt, time.Now(), rescheduleConfirmWindow); err != nil {
 		return nil, err
 	}
 	return s.bookingRepo.Update(ctx, id, booking)
 }
 
+// Неизвестный сотрудник считается обычным (regular).
 func (s *BookingService) canOverride(ctx context.Context, employeeID int64) (bool, error) {
 	emp, err := s.employeeRepo.Get(ctx, employeeID)
 	if errors.Is(err, domain.ErrEmployeeNotFound) {

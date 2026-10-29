@@ -6,10 +6,11 @@ import (
 )
 
 var (
-	ErrInvalidInterval = errors.New("end_at must be after start_at")
-	ErrBookingNotFound = errors.New("booking not found")
-	ErrRoomBooked      = errors.New("room is already booked for this time")
-	ErrCancelled       = errors.New("cannot reschedule cancelled booking")
+	ErrInvalidInterval  = errors.New("end_at must be after start_at")
+	ErrBookingNotFound  = errors.New("booking not found")
+	ErrRoomBooked       = errors.New("room is already booked for this time")
+	ErrCancelled        = errors.New("cannot reschedule cancelled booking")
+	ErrEmployeeNotFound = errors.New("employee not found")
 )
 
 type Status string
