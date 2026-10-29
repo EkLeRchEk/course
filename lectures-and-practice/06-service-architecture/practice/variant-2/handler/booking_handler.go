@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/course-go-autumn-2026/practice6-variant2-booking/domain"
+	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
 )
 
 // Интерфейс для взаимодействия с сервисным слоем.
