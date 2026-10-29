@@ -88,8 +88,8 @@ func (h *BookingHandler) Create(
 	w.WriteHeader(http.StatusCreated)
 
 	_ = json.NewEncoder(w).Encode(createBookingResponse{
-		ID:     booking.ID,
-		Status: string(booking.Status),
+		ID:     booking.ID(),
+		Status: string(booking.Status()),
 	})
 }
 
@@ -160,15 +160,18 @@ func (h *BookingHandler) UpdateTime(
 
 // Формирование JSON-ответа с полной информацией о брони.
 func writeBooking(w http.ResponseWriter, b *domain.Booking) {
+	// Получаем снимок состояния бронирования из Domain.
+	snapshot := b.Snapshot()
+
 	w.Header().Set("Content-Type", "application/json")
 
 	_ = json.NewEncoder(w).Encode(bookingResponse{
-		ID:         b.ID,
-		RoomID:     b.RoomID,
-		EmployeeID: b.EmployeeID,
-		StartAt:    b.StartAt,
-		EndAt:      b.EndAt,
-		Status:     string(b.Status),
-		CreatedAt:  b.CreatedAt,
+		ID:         snapshot.ID,
+		RoomID:     snapshot.RoomID,
+		EmployeeID: snapshot.EmployeeID,
+		StartAt:    snapshot.StartAt,
+		EndAt:      snapshot.EndAt,
+		Status:     string(snapshot.Status),
+		CreatedAt:  snapshot.CreatedAt,
 	})
 }
