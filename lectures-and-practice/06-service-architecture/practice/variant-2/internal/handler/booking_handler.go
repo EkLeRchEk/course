@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
+	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/service"
 )
 
 // Интерфейс для взаимодействия с сервисным слоем.
 type BookingService interface {
 	Create(
 		ctx context.Context,
-		roomID, employeeID int64,
-		startAt, endAt time.Time,
+		in service.CreateBookingInput,
 	) (*domain.Booking, error)
 
 	Get(
@@ -72,10 +72,12 @@ func (h *BookingHandler) Create(
 	// Передаём создание бронирования сервисному слою.
 	booking, err := h.service.Create(
 		r.Context(),
-		req.RoomID,
-		req.EmployeeID,
-		startAt,
-		endAt,
+		service.CreateBookingInput{
+			RoomID:     req.RoomID,
+			EmployeeID: req.EmployeeID,
+			StartAt:    startAt,
+			EndAt:      endAt,
+		},
 	)
 
 	if err != nil {
@@ -112,6 +114,7 @@ func (h *BookingHandler) Get(
 		return
 	}
 
+	// Возвращаем полную информацию о бронировании.
 	writeBooking(w, booking)
 }
 
@@ -155,6 +158,7 @@ func (h *BookingHandler) UpdateTime(
 		return
 	}
 
+	// Возвращаем обновлённое бронирование.
 	writeBooking(w, booking)
 }
 
