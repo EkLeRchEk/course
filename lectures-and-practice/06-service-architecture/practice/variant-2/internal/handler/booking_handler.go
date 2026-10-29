@@ -1,42 +1,21 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/course-go-autumn-2026/practice6-variant2-booking/domain"
+	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
+	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/service"
 )
-
-// Интерфейс для взаимодействия с сервисным слоем.
-type BookingService interface {
-	Create(
-		ctx context.Context,
-		roomID, employeeID int64,
-		startAt, endAt time.Time,
-	) (*domain.Booking, error)
-
-	Get(
-		ctx context.Context,
-		id int64,
-	) (*domain.Booking, error)
-
-	Reschedule(
-		ctx context.Context,
-		id int64,
-		startAt, endAt time.Time,
-	) (*domain.Booking, error)
-}
 
 // Структура HTTP-обработчика.
 type BookingHandler struct {
-	service BookingService
+	service service.BookingService
 }
 
 // Конструктор обработчика.
-func NewBookingHandler(s BookingService) *BookingHandler {
+func NewBookingHandler(s service.BookingService) *BookingHandler {
 	return &BookingHandler{
 		service: s,
 	}
