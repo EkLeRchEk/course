@@ -1,21 +1,42 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
 	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/service"
 )
 
+// Интерфейс для взаимодействия с сервисным слоем.
+type BookingService interface {
+	Create(
+		ctx context.Context,
+		in service.CreateBookingInput,
+	) (*domain.Booking, error)
+
+	Get(
+		ctx context.Context,
+		id int64,
+	) (*domain.Booking, error)
+
+	Reschedule(
+		ctx context.Context,
+		id int64,
+		startAt, endAt time.Time,
+	) (*domain.Booking, error)
+}
+
 // Структура HTTP-обработчика.
 type BookingHandler struct {
-	service service.BookingService
+	service BookingService
 }
 
 // Конструктор обработчика.
-func NewBookingHandler(s service.BookingService) *BookingHandler {
+func NewBookingHandler(s BookingService) *BookingHandler {
 	return &BookingHandler{
 		service: s,
 	}
@@ -51,10 +72,12 @@ func (h *BookingHandler) Create(
 	// Передаём создание бронирования сервисному слою.
 	booking, err := h.service.Create(
 		r.Context(),
-		req.RoomID,
-		req.EmployeeID,
-		startAt,
-		endAt,
+		service.CreateBookingInput{
+			RoomID:     req.RoomID,
+			EmployeeID: req.EmployeeID,
+			StartAt:    startAt,
+			EndAt:      endAt,
+		},
 	)
 
 	if err != nil {
@@ -67,8 +90,8 @@ func (h *BookingHandler) Create(
 	w.WriteHeader(http.StatusCreated)
 
 	_ = json.NewEncoder(w).Encode(createBookingResponse{
-		ID:     booking.ID,
-		Status: string(booking.Status),
+		ID:     booking.ID(),
+		Status: string(booking.Status()),
 	})
 }
 
@@ -91,6 +114,7 @@ func (h *BookingHandler) Get(
 		return
 	}
 
+	// Возвращаем полную информацию о бронировании.
 	writeBooking(w, booking)
 }
 
@@ -134,20 +158,24 @@ func (h *BookingHandler) UpdateTime(
 		return
 	}
 
+	// Возвращаем обновлённое бронирование.
 	writeBooking(w, booking)
 }
 
 // Формирование JSON-ответа с полной информацией о брони.
 func writeBooking(w http.ResponseWriter, b *domain.Booking) {
+	// Получаем снимок состояния бронирования из Domain.
+	snapshot := b.Snapshot()
+
 	w.Header().Set("Content-Type", "application/json")
 
 	_ = json.NewEncoder(w).Encode(bookingResponse{
-		ID:         b.ID,
-		RoomID:     b.RoomID,
-		EmployeeID: b.EmployeeID,
-		StartAt:    b.StartAt,
-		EndAt:      b.EndAt,
-		Status:     string(b.Status),
-		CreatedAt:  b.CreatedAt,
+		ID:         snapshot.ID,
+		RoomID:     snapshot.RoomID,
+		EmployeeID: snapshot.EmployeeID,
+		StartAt:    snapshot.StartAt,
+		EndAt:      snapshot.EndAt,
+		Status:     string(snapshot.Status),
+		CreatedAt:  snapshot.CreatedAt,
 	})
 }

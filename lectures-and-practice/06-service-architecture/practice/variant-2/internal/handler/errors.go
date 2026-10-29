@@ -4,13 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/course-go-autumn-2026/practice6-variant2-booking/domain"
+	"github.com/course-go-autumn-2026/practice6-variant2-booking/internal/domain"
 )
 
 // writeError преобразует ошибки бизнес-логики в HTTP-ответы.
 func writeError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, domain.ErrBookingNotFound):
 		// Бронирование не найдено.
 		w.WriteHeader(http.StatusNotFound)
 
@@ -30,7 +30,7 @@ func writeError(w http.ResponseWriter, err error) {
 			http.StatusConflict,
 		)
 
-	case errors.Is(err, domain.ErrBookingCancelled):
+	case errors.Is(err, domain.ErrCancelled):
 		// Нельзя изменить отменённое бронирование.
 		http.Error(
 			w,
